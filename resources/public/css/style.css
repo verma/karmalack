@@ -1,2 +1,67 @@
 /* some style */
 
+.home {
+    margin-top: 3em;
+}
+
+.home h1 {
+    color: #9A6C91;
+    border-bottom: 1px dashed #ddd;
+    padding: 10px;
+}
+
+.home .slack {
+    color: #50092F;
+}
+
+.home .page-title {
+    color: #bbb;
+    text-transform: uppercase;
+    font-size: 0.5em;
+    margin-top: 20px;
+}
+
+.mini-profile {
+    padding: 5px 10px;
+}
+
+.mini-profile h3 {
+    margin: 8px 0 8px 16px;
+}
+
+.mini-profile h4 {
+    margin: 18px;
+    color: #aaa;
+    text-transform: uppercase;
+    font-size: 0.9em;
+}
+
+.mini-profile .karma {
+    color: #ccc;
+    font-size: 1.8em;
+}
+
+.mini-profile .karma .count {
+    display: inline-block;
+    margin-right: 10px;
+}
+
+.mini-profile .karma .today {
+    display: inline-block;
+    font-size: 0.9em;
+    color: rgba(0,100,0,0.5);
+}
+
+.mini-profile .image {
+    width: 48px;
+    height: 48px;
+
+    background: url(http://www.gravatar.com/avatar/205e460b479e2e5b48aec07710c08d50?s=50);
+
+    -webkit-border-radius: 50%;
+    -moz-border-radius: 50%;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+
