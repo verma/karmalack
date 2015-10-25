@@ -8,6 +8,7 @@ pom.xml
 /classes/
 /out/
 /target/
+/projectFilesBackup/
 .lein-deps-sum
 .lein-repl-history
 .lein-plugins/
