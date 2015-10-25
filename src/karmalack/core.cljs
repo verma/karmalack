@@ -23,6 +23,8 @@
 (om/root main-app state/app-state
          {:target (.getElementById js/document "app")})
 
+(state/set-view! :home)
+
 (defn on-js-reload []
   ;; optionally touch your app-state to force rerendering depending on
   ;; your application

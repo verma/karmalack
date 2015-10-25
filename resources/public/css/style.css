@@ -7,7 +7,7 @@
 .home h1 {
     color: #9A6C91;
     border-bottom: 1px dashed #ddd;
-    padding: 10px;
+    padding: 0 10px;
 }
 
 .home .slack {
@@ -21,12 +21,29 @@
     margin-top: 20px;
 }
 
+.home h1 input {
+    padding: 5px;
+    margin-left: 40px;
+    margin-top: 20px;
+    font-size: 0.5em;
+    border: none;
+    outline: none;
+    color: #333;
+    width: 100%;
+}
+
 .mini-profile {
     padding: 5px 10px;
 }
 
 .mini-profile h3 {
     margin: 8px 0 8px 16px;
+}
+
+.mini-profile .name.online:after {
+    content: "\25cf";
+    color: #32978D;
+    margin-left: 5px;
 }
 
 .mini-profile h4 {

@@ -9,12 +9,20 @@
                  [org.clojure/core.async "0.1.346.0-17112a-alpha"]
                  [org.omcljs/om "0.9.0"]
                  [secretary "1.2.3"]
-                 [sablono "0.3.6"]]
+                 [cljs-http "0.1.37"]
+                 [sablono "0.3.6"]
+                 [compojure "1.4.0"]
+                 [liberator "0.13"]
+                 [org.julienxx/clj-slack "0.5.1"]
+                 [environ "1.0.1"]
+                 [ring-cors "0.1.7"]
+                 [ring/ring-defaults "0.1.2"]
+                 [ring/ring-devel "1.4.0"]]
 
   :plugins [[lein-cljsbuild "1.1.0"]
             [lein-figwheel "0.4.1"]]
 
-  :source-paths ["src"]
+  :source-paths ["src" "server"]
 
   :clean-targets ^{:protect false} ["resources/public/js/compiled" "target"]
 
@@ -50,7 +58,7 @@
              ;; if you want to embed a ring handler into the figwheel http-kit
              ;; server, this is for simple ring servers, if this
              ;; doesn't work for you just run your own server :)
-             ;; :ring-handler hello_world.server/handler
+             :ring-handler karmalack.server/app
 
              ;; To be able to open files in your editor from the heads up display
              ;; you will need to put a script on your path.
