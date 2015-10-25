@@ -29,7 +29,7 @@
 
 (defn- url [& parts]
   (apply str
-         "http://localhost:3000/"
+         "/api/"
          (clojure.string/join "/" parts)))
 
 (defn load-users!

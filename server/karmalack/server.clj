@@ -27,9 +27,8 @@
                           (:members res))}))))
 
 (defroutes app-routes
-  (GET "/" [] "Hello World")
-  (GET "/users" [] (get-users))
-  (route/not-found "Not Found"))
+  (context "/api" []
+    (ANY "/users" [] (get-users))))
 
 (def app
  (-> app-routes

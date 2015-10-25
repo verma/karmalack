@@ -81,4 +81,13 @@
     display: inline-block;
 }
 
+.no-users {
+    font-size: 1.1em;
+    color: #999;
+    padding: 10px;
+}
 
+.loading {
+    padding: 10px;
+    color: #999;
+}
