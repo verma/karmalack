@@ -13,14 +13,22 @@
                  [sablono "0.3.6"]
                  [compojure "1.4.0"]
                  [liberator "0.13"]
+                 [org.clojure/java.jdbc "0.4.2"]
                  [org.julienxx/clj-slack "0.5.1"]
                  [environ "1.0.1"]
+                 [org.postgresql/postgresql "9.4-1204-jdbc41"]
+                 [yesql "0.5.1"]
+                 [clj-time "0.11.0"]
+                 [com.datomic/datomic-free "0.9.5153"]
                  [ring-cors "0.1.7"]
                  [ring/ring-defaults "0.1.2"]
                  [ring/ring-devel "1.4.0"]]
 
   :plugins [[lein-cljsbuild "1.1.0"]
             [lein-figwheel "0.4.1"]]
+
+  :profiles {:dev
+             {:datomic {:config "resources/free-transactor-template.properties"}}}
 
   :source-paths ["src" "server"]
 

@@ -6,7 +6,7 @@
 
 .home h1 {
     color: #9A6C91;
-    border-bottom: 1px dashed #ddd;
+    border-bottom: 1px solid #eee;
     padding: 0 10px;
 }
 
@@ -34,6 +34,11 @@
 
 .mini-profile {
     padding: 5px 10px;
+    border-bottom: 1px dashed #eee;
+}
+
+.mini-profile:last-child {
+    border-bottom: none;
 }
 
 .mini-profile h3 {

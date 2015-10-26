@@ -1,5 +1,6 @@
 (ns karmalack.server
  (:require [karmalack.config :refer [slack-conn-config]]
+           [karmalack.db :as db]
            [compojure.core :refer :all]
            [compojure.route :as route]
            [liberator.core :refer [defresource resource]]
@@ -16,15 +17,22 @@
   :handle-ok (fn [ctx]
                (let [res (slack/slack-request
                            (slack-conn-config)
-                           "users.list" {"presence" "1"})]
+                           "users.list" {"presence" "1"})
+                     karma-stats (db/karma-stats)
+                     settings (db/all-user-settings)]
                  (when (:ok res)
                    {:users
-                    (mapv #(hash-map
-                            :id (:id %)
-                            :name (:name %)
-                            :presence (:presence %)
-                            :image (get-in % [:profile :image_48]))
-                          (:members res))}))))
+                    (mapv
+                      (fn [e]
+                        (-> (select-keys e [:id :name :presence])
+                            (merge (when-let [stats (get karma-stats (:id e))]
+                                     {:karma stats}))
+                            (merge (when-let [s (get settings (:id e))]
+                                     {:settings s}))
+                            (assoc :image (get-in e [:profile :image_48]))))
+                      (:members res))}))))
+
+(db/karma-stats)
 
 (defroutes app-routes
   (context "/api" []

@@ -6,12 +6,7 @@
   (:require-macros [cljs.core.async.macros :refer [go]]))
 
 
-(defn- format-today [n]
-  (if (neg? n)
-    (str "(" n ")")
-    (str "(+" n ")")))
-
-(defn mini-profile-view [{:keys [presence name skill image]} owner]
+(defn mini-profile-view [{:keys [presence name image settings karma]} owner]
   (reify
     om/IRender
     (render [_]
@@ -22,11 +17,12 @@
           {:class (when (= presence "active")
                     "online")}
           name]
-         [:h4.skill.pull-left skill]
-         #_(when (or score today)
-           [:.karma.pull-right [:.count score]
-            (when today
-              [:.today (format-today today)])])]))))
+
+         (when-not (clojure.string/blank? (:skill settings))
+           [:h4.skill.pull-left (:skill settings)])
+
+         (when karma
+           [:.karma.pull-right [:.count karma]])]))))
 
 (defn- filter-users [users filter]
   (if (clojure.string/blank? filter)
