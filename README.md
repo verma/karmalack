@@ -19,6 +19,7 @@ Navigate to [http://localhost:3449/](http://localhost:3449/).
 You can configure the following fields for now:
 
  - `:slack-api-token` - This is the slack api token you can get from the [Slack API Page](https://api.slack.com/web) page.
+ - `:slack-bot-token` - A slack bot token which you can get by [creating a new bot for your team](https://mazira.slack.com/services/new/bot).
 
 
 ## License

@@ -32,8 +32,6 @@
                             (assoc :image (get-in e [:profile :image_48]))))
                       (:members res))}))))
 
-(db/karma-stats)
-
 (defroutes app-routes
   (context "/api" []
     (ANY "/users" [] (get-users))))

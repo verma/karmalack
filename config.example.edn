@@ -1,1 +1,2 @@
-{:slack-api-key "XXXXXXX"}
+{:slack-api-key "XXXXXXX"
+ :slack-bot-token "XXXXXXXX"}
