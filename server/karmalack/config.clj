@@ -10,3 +10,7 @@
   (let [c (config)]
     {:api-url "https://slack.com/api"
      :token (:slack-api-token c)}))
+
+(defn dev? []
+  (not (nil? (:dev env))))
+

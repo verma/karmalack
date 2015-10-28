@@ -1,28 +1,21 @@
 (ns karmalack.slack
-  (:require [karmalack.config :as config]
+  (:require [karmalack.db :as db]
+            [com.stuartsierra.component :as component]
             [slack-rtm.core :as rtm]
             [clojure.core.async :refer [go go-loop <!]]))
 
-
-(def conn (rtm/connect (:slack-bot-token (config/config))))
-
-(def events-chan (:events-publication conn))
-(def dispatcher (:dispatcher conn))
-
-(def self-id (get-in conn [:start :self :id]))
-(def self-name (get-in conn [:start :self :name]))
 
 (defn starts-with [s ss]
   (not (neg? (.indexOf s ss))))
 
 
-(defn parse-command [msg]
+(defn- parse-command [msg self-id]
   (when-let [[_ id text] (re-matches #"^<@([A-Z0-9]+)>:?(.*)" msg)]
     (when (= id self-id)
       (clojure.string/split
         (clojure.string/trim text) #" "))))
 
-(defn validate-user [tag]
+(defn- validate-user [tag]
   (if-let [v (and (not (nil? tag))
                   (when-let [r (re-matches #"^<@([A-Z0-9]+)>" tag)]
                     (second r)))]
@@ -33,22 +26,24 @@
 (defn- to-user [id msg]
   (str "<@" id ">: " msg))
 
-(defmulti handle-command first)
+(defmulti handle-command (fn [cmd db from channel]
+                           (first cmd)))
 
-(defmethod handle-command "inc" [[_ user]]
+(defmethod handle-command "inc" [[_ user] db from channel]
   (let [u (validate-user user)]
-    (str "going to inc karma: @" u)))
+    (str "going to inc karma: @" u)
+    (db/karma-inc! db u channel)))
 
-(defmethod handle-command "dec" [[_ user]]
+(defmethod handle-command "dec" [[_ user] db _ _]
   (let [u (validate-user user)]
     (str "going to dec karma: @" u)))
 
-(defmethod handle-command "banner" [[_ url]]
+(defmethod handle-command "banner" [[_ url] db _ _]
   (if-let [r (re-matches #"^<(https:\/\/.*)>$" (or url ""))]
     (str "your banner has been updated: " (second r))
     (throw (Exception. "banner command needs a https url as a argument."))))
 
-(defmethod handle-command "skill" [[_ s & parts]]
+(defmethod handle-command "skill" [[_ s & parts] db _ _]
   (if (clojure.string/blank? s)
     "your skill has been cleared"
     (str
@@ -56,22 +51,49 @@
                                            " "
                                            (concat [s] parts)))))
 
-(defmethod handle-command :default [_]
-  (str "Sorry I don't understand that command, known commands: inc, dec"))
+(defmethod handle-command :default [_ _ _ _]
+  (str "Sorry I don't understand that command, known commands: inc, dec, banner and skill"))
 
-(defn dispatch-handler [cmd & args])
+(defrecord SlackBot [slack-bot-token connection chan database]
+  component/Lifecycle
+  (start [this]
+    (if connection
+      connection
+      (let [conn (rtm/connect slack-bot-token)
+            self-id (get-in conn [:start :self :id])
+            self-name (get-in conn [:start :self :name])
+            chan (rtm/sub-to-event (:events-publication conn) :message)]
+        (println ":: sb :: startup as:" self-name "and id:" self-id)
 
-(rtm/sub-to-event events-chan
-                  :message
-                  (fn [{:keys [channel user text]}]
-                    (println channel user text)
-                    (when-let [cmd (parse-command text)]
-                      (let [r (try
-                                (handle-command cmd)
-                                (catch Exception e
-                                  (.getMessage e)))]
-                        (rtm/send-event
-                          dispatcher
-                          {:type    "message"
-                           :channel channel
-                           :text    (to-user user r)})))))
+        ;; start a go look
+        (go-loop []
+          (when-let [{:keys [channel user text]} (<! chan)]
+            (println ":: sb :: " channel user text)
+
+            (when (and channel user text)
+              (when-let [cmd (parse-command text self-id)]
+                (let [r (try
+                          (handle-command cmd database)
+                          (catch Exception e
+                            (.getMessage e)))]
+                  (rtm/send-event
+                    (:dispatcher conn)
+                    {:type    "message"
+                     :channel channel
+                     :text    (to-user user r)}))))
+            (recur)))
+
+        (assoc this :connection conn
+                    :chan chan))))
+
+  (stop [this]
+    (if connection
+      (do
+        (println ":: sb :: shutdown.")
+        (rtm/unsub-from-event (:events-publication connection) :message chan)
+        (assoc this :connection nil :chan nil))
+      this)))
+
+(defn new-slackbot [config]
+  (map->SlackBot config))
+

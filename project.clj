@@ -14,6 +14,7 @@
                  [compojure "1.4.0"]
                  [liberator "0.13"]
                  [org.clojure/java.jdbc "0.4.2"]
+                 [com.stuartsierra/component "0.3.0"]
                  [org.julienxx/clj-slack "0.5.1"]
                  [environ "1.0.1"]
                  [org.postgresql/postgresql "9.4-1204-jdbc41"]
@@ -32,6 +33,7 @@
              {:datomic {:config "resources/free-transactor-template.properties"}}}
 
   :source-paths ["src" "server"]
+  :main karmalack.core
 
   :clean-targets ^{:protect false} ["resources/public/js/compiled" "target"]
 

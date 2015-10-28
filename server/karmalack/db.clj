@@ -4,16 +4,31 @@
             [clj-time.core :as t]
             [clj-time.local :as l]
             [clj-time.coerce :as c]
+            [com.stuartsierra.component :as component]
             [datomic.api :as d]))
 
-(def uri "datomic:free://localhost:4334/karmalack")
-(def conn (d/connect uri))
+(defrecord Database [datomic-uri connection]
+  component/Lifecycle
+  (start [this]
+    ;; initialize our database
+    (println ":: db :: startup with:" datomic-uri)
+    (if connection
+      this
+      (assoc this :connection (d/connect datomic-uri))))
 
-(defn find-user-by-id [id]
+  (stop [this]
+    (if-not connection
+      this
+      (do
+        (println ":: db :: shutdown.")
+        (assoc this :connection nil)))))
+
+
+(defn- find-user-by-id [conn id]
   (let [db (d/db conn)]
     (:db/id (d/entity db [:user/userid id]))))
 
-(defn add-user [id]
+(defn- add-user [conn id]
   (let [r @(d/transact
              conn
              [{:db/id (d/tempid :db.part/user)
@@ -22,13 +37,13 @@
                :user/banner ""}])]
     (-> r :tempids vals first)))
 
-(defn- user-entity [userid]
-  (if-let [u (find-user-by-id userid)]
+(defn- user-entity [conn userid]
+  (if-let [u (find-user-by-id conn userid)]
     u
-    (add-user userid)))
+    (add-user conn userid)))
 
-(defn- karma-delta [delta userid source]
-  (let [id (user-entity userid)]
+(defn- karma-delta [conn delta userid source]
+  (let [id (user-entity conn userid)]
     @(d/transact
        conn
        [{:db/id        (d/tempid :db.part/user)
@@ -37,34 +52,37 @@
          :karma/delta  delta
          :karma/ts     (java.util.Date.)}])))
 
-(def karma-inc! (partial karma-delta 1))
-(def karma-dec! (partial karma-delta -1))
+(defn karma-inc! [component userid source]
+  (karma-delta (:connection component) 1 userid source))
 
-(defn settings-save-skill! [userid skill]
+(defn karma-dec! [component userid source]
+  (karma-delta (:connection component) -1 userid source))
+
+(defn settings-save-skill! [component userid skill]
   @(d/transact
-     conn
+     (:connection component)
      [{:db/id       (d/tempid :db.part/user)
        :user/userid userid
        :user/skill  skill}]))
 
-(defn settings-save-banner! [userid banner]
+(defn settings-save-banner! [component userid banner]
   @(d/transact
-     conn
+     (:connection component)
      [{:db/id       (d/tempid :db.part/user)
        :user/userid  userid
        :user/banner  banner}]))
 
-(defn karma-stats []
+(defn karma-stats [component]
   (let [totals (into {}
                      (d/q '[:find ?userid (sum ?delta)
                             :with ?k
                             :where [?u :user/userid ?userid]
                             [?k :karma/user ?u]
                             [?k :karma/delta ?delta]]
-                          (d/db conn)))]
+                          (d/db (:connection component))))]
     totals))
 
-(defn all-user-settings []
+(defn all-user-settings [component]
   (->>
     (d/q
       '[:find ?userid ?skill ?banner
@@ -72,13 +90,15 @@
         [?u :user/userid ?userid]
         [?u :user/skill ?skill]
         [?u :user/banner ?banner]]
-      (d/db conn))
+      (d/db (:connection component)))
     (map (fn [[id skill banner]]
            [id {:skill skill :banner banner}]))
     (into {})))
 
 
-(defn setup-database! []
+
+
+(defn setup-database! [uri]
   (d/create-database uri)
   @(d/transact
      (d/connect uri)
@@ -145,11 +165,12 @@
         :db.install/_attribute :db.part/db}
        ]))
 
-(setup-database!)
-
-(defn cleanup! []
+#_(defn cleanup! []
   (d/delete-database uri))
 
-(defn reset-database! []
+#_(defn reset-database! []
   (cleanup!)
   (setup-database!))
+
+(defn new-database [config]
+  (map->Database config))
