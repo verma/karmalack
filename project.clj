@@ -11,6 +11,7 @@
                  [secretary "1.2.3"]
                  [cljs-http "0.1.37"]
                  [sablono "0.3.6"]
+                 [http-kit "2.1.18"]
                  [compojure "1.4.0"]
                  [liberator "0.13"]
                  [org.clojure/java.jdbc "0.4.2"]
@@ -30,7 +31,8 @@
             [lein-figwheel "0.4.1"]]
 
   :profiles {:dev
-             {:datomic {:config "resources/free-transactor-template.properties"}}}
+             {:dependencies [[figwheel-sidecar "0.4.1"]]
+              :datomic {:config "resources/free-transactor-template.properties"}}}
 
   :source-paths ["src" "server"]
   :main karmalack.core
