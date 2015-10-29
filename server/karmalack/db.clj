@@ -42,21 +42,22 @@
     u
     (add-user conn userid)))
 
-(defn- karma-delta [conn delta userid source]
+(defn- karma-delta [conn delta userid from source]
   (let [id (user-entity conn userid)]
     @(d/transact
        conn
        [{:db/id        (d/tempid :db.part/user)
          :karma/user   id
+         :karma/grantee from
          :karma/source source
          :karma/delta  delta
          :karma/ts     (java.util.Date.)}])))
 
-(defn karma-inc! [component userid source]
-  (karma-delta (:connection component) 1 userid source))
+(defn karma-inc! [component userid from source]
+  (karma-delta (:connection component) 1 userid from source))
 
-(defn karma-dec! [component userid source]
-  (karma-delta (:connection component) -1 userid source))
+(defn karma-dec! [component userid from source]
+  (karma-delta (:connection component) -1 userid from source))
 
 (defn settings-save-skill! [component userid skill]
   @(d/transact
@@ -151,6 +152,13 @@
         :db.install/_attribute :db.part/db}
 
        {:db/id                 #db/id[:db.part/db]
+        :db/ident              :karma/grantee
+        :db/valueType          :db.type/string
+        :db/cardinality        :db.cardinality/one
+        :db/doc                "The user who granted this karma point"
+        :db.install/_attribute :db.part/db}
+
+       {:db/id                 #db/id[:db.part/db]
         :db/ident              :karma/delta
         :db/valueType          :db.type/long
         :db/cardinality        :db.cardinality/one
@@ -165,12 +173,13 @@
         :db.install/_attribute :db.part/db}
        ]))
 
-#_(defn cleanup! []
+(defn cleanup! [uri]
   (d/delete-database uri))
 
-#_(defn reset-database! []
-  (cleanup!)
-  (setup-database!))
+(defn reset-database! []
+  (let [uri "datomic:free://localhost:4334/karmalack1"]
+    (cleanup! uri)
+    (setup-database! uri)))
 
 (defn new-database [config]
   (map->Database config))

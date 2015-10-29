@@ -20,7 +20,7 @@
                   (when-let [r (re-matches #"^<@([A-Z0-9]+)>" tag)]
                     (second r)))]
     v
-    (throw (Exception. "A valid user id is needed as an argument, e.g. @user."))))
+    (throw (Exception. ":thumbsdown: a valid user id is needed as an argument, e.g. @user."))))
 
 
 (defn- to-user [id msg]
@@ -31,28 +31,38 @@
 
 (defmethod handle-command "inc" [[_ user] db from channel]
   (let [u (validate-user user)]
-    (str "going to inc karma: @" u)
-    (db/karma-inc! db u channel)))
+    (when (= u from)
+      (throw (Exception. ":thumbsdown: you cannot assign karma to yourself.")))
+    (db/karma-inc! db u from channel)
+    ":thumbsup:"))
 
-(defmethod handle-command "dec" [[_ user] db _ _]
+(defmethod handle-command "dec" [[_ user] db from channel]
   (let [u (validate-user user)]
-    (str "going to dec karma: @" u)))
+    (when (= u from)
+      (throw (Exception. ":thumbsdown: you cannot assign karma to yourself.")))
+    (db/karma-dec! db u from channel)
+    ":thumbsup:"))
 
-(defmethod handle-command "banner" [[_ url] db _ _]
+(defmethod handle-command "banner" [[_ url] db from _]
   (if-let [r (re-matches #"^<(https:\/\/.*)>$" (or url ""))]
-    (str "your banner has been updated: " (second r))
-    (throw (Exception. "banner command needs a https url as a argument."))))
+    (do
+      (db/settings-save-banner! db from url)
+      (str "banner update :thumbsup:"))
+    (throw (Exception. ":thumbsdown: banner command needs a https url as an argument."))))
 
-(defmethod handle-command "skill" [[_ s & parts] db _ _]
+(defmethod handle-command "skill" [[_ s & parts] db from _]
   (if (clojure.string/blank? s)
-    "your skill has been cleared"
-    (str
-      "your skill has been updated to: " (clojure.string/join
-                                           " "
-                                           (concat [s] parts)))))
+    (do
+      (db/settings-save-skill! db from "")
+      "skill cleared :thumbsup:")
+    (let [skill (clojure.string/join
+                  " "
+                  (concat [s] parts))]
+      (db/settings-save-skill! db from skill)
+      "skill updated :thumbsup:")))
 
 (defmethod handle-command :default [_ _ _ _]
-  (str "Sorry I don't understand that command, known commands: inc, dec, banner and skill"))
+  (str "Sorry I don't understand that command, known commands: inc, dec, banner and skill."))
 
 (defrecord SlackBot [slack-bot-token connection chan database]
   component/Lifecycle
@@ -73,7 +83,7 @@
             (when (and channel user text)
               (when-let [cmd (parse-command text self-id)]
                 (let [r (try
-                          (handle-command cmd database)
+                          (handle-command cmd database user channel)
                           (catch Exception e
                             (.getMessage e)))]
                   (rtm/send-event
