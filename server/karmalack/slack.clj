@@ -46,7 +46,7 @@
 (defmethod handle-command "banner" [[_ url] db from _]
   (if-let [r (re-matches #"^<(https:\/\/.*)>$" (or url ""))]
     (do
-      (db/settings-save-banner! db from url)
+      (db/settings-save-banner! db from (second r))
       (str "banner update :thumbsup:"))
     (throw (Exception. ":thumbsdown: banner command needs a https url as an argument."))))
 

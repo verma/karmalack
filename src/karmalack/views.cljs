@@ -1,21 +1,23 @@
 (ns karmalack.views
   (:require [sablono.core :as html :refer-macros [html]]
-            [om.core :as om]
+            [om.core :as om :refer-macros [component]]
             [karmalack.state :as state]
+            [karmalack.routes :as routes]
             [cljs.core.async :as async :refer [<!]])
   (:require-macros [cljs.core.async.macros :refer [go]]))
 
 
-(defn mini-profile-view [{:keys [presence name image settings karma]} owner]
+(defn mini-profile-view [{:keys [id presence name avatar-small settings karma]} owner]
   (reify
     om/IRender
     (render [_]
       (html
         [:.mini-profile.clearfix
-         [:.image.pull-left {:style {:background (str "url(" image ")")}}]
-         [:h3.name.pull-left
+         [:.image.pull-left {:style {:background (str "url(" avatar-small ")")}}]
+         [:a.name.pull-left
           {:class (when (= presence "active")
-                    "online")}
+                    "online")
+           :href  (routes/user {:id id})}
           name]
 
          (when-not (clojure.string/blank? (:skill settings))
@@ -69,4 +71,93 @@
                (if-let [s (seq filtered-users)]
                  (om/build-all mini-profile-view s {:key :id})
                  [:.no-users "No users."]))]]])))))
+
+(def ^:private patterns
+  ["http://cdn.backgroundhost.com/backgrounds/subtlepatterns/escheresque_ste.png"
+   "http://cdn.backgroundhost.com/backgrounds/subtlepatterns/hixs_pattern_evolution.png"
+   "http://cdn.backgroundhost.com/backgrounds/subtlepatterns/gun_metal.png"
+   "http://cdn.backgroundhost.com/backgrounds/subtlepatterns/skin_side_up.png"
+   "http://cdn.backgroundhost.com/backgrounds/subtlepatterns/subtle_orange_emboss.png"
+   "http://cdn.backgroundhost.com/backgrounds/subtlepatterns/dark_wood.png"])
+
+(defn user-view-banner [{:keys [username skill banner avatar]} owner]
+  (reify
+    om/IInitState
+    (init-state [_]
+      {:bg (rand-nth patterns)})
+
+    om/IRenderState
+    (render-state [_ {:keys [bg]}]
+      (let [banner-style (if (clojure.string/blank? banner)
+                           {:background-image  (str "url(" bg ")")
+                            :background-size   "auto auto"
+                            :background-repeat "repeat"}
+                           {:background-image (str "url(" banner ")")
+                            :background-size  "cover"})]
+        (html
+          [:.banner
+           {:style banner-style}
+           [:.user-info
+            [:.useravatar
+             {:style {:background-image (str "url(" avatar ")")}}]
+            [:.username username]
+            [:.skill skill]]])))))
+
+(defn karma-stats [{:keys [total up down]} owner]
+  (component
+    (html [:.karma-stats
+           [:.total total]
+           [:.up up
+            [:i.fa.fa-arrow-up]]
+           [:.down down
+            [:i.fa.fa-arrow-down]]
+           ])))
+
+(defn user-content-pane [title child]
+  [:.content-panel.panel.panel-default
+   [:.panel-heading [:h4 title]]
+   [:.panel-body child]])
+
+
+(defn compute-karma-stats [stats]
+  (println stats)
+  (let [up (keep (fn [[_ _ d]] (when (pos? d) d)) stats)
+        down (keep (fn [[_ _ d]] (when (neg? d) d)) stats)
+        tup (apply + up)
+        tdown (apply + down)]
+    {:total (+ tup tdown)
+     :up tup
+     :down (js/Math.abs tdown)}))
+
+(defn- enough-data? [s]
+  (> (count s) 5))
+
+(defn user-view [data owner]
+  (reify
+    om/IRender
+    (render [_]
+      (let [cu (om/observe owner state/current-user)
+            stats (seq (:stats @cu))]
+        (println "-- -- stats:" stats)
+        (html
+          [:.user-view
+           (om/build user-view-banner {:username (str "@" (:name @cu))
+                                       :skill    (:skill @cu)
+                                       :avatar   (:avatar @cu)
+                                       :banner   (:banner @cu)})
+           [:.container.user-stats
+            [:.row
+             [:.col-xs-6
+              (user-content-pane
+                "Karma"
+                (om/build karma-stats
+                          (if stats
+                            (compute-karma-stats stats)
+                            {:total 0 :up 0 :down 0})))]
+
+
+             [:.col-xs-6
+              (user-content-pane
+                "Score History"
+                [:.no-data "Not enough data."])]]]])))))
 

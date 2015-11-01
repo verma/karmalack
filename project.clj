@@ -23,6 +23,7 @@
                  [clj-time "0.11.0"]
                  [com.datomic/datomic-free "0.9.5153"]
                  [slack-rtm "0.1.0"]
+                 [org.clojure/core.cache "0.6.4"]
                  [ring-cors "0.1.7"]
                  [ring/ring-defaults "0.1.2"]
                  [ring/ring-devel "1.4.0"]]

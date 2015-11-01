@@ -6,6 +6,7 @@
 
 ;; app state
 (defonce app-state (atom {:all-users []
+                          :current-user {}
                           :current-view :home}))
 
 ;; root cursor into our state
@@ -14,18 +15,23 @@
 ;; overserable views into app state
 (def root (om/ref-cursor root-cursor))
 (def all-users (om/ref-cursor (:all-users root)))
+(def current-user (om/ref-cursor (:current-user root)))
 
 (declare load-users!)
+(declare load-user-info!)
 
 (defn set-view!
   "Change the application view to the specified one"
-  [view]
-  (om/transact! root-cursor #(assoc % :current-view view))
-
-  (case view
-    :home
-    (load-users!)))
-
+  ([view]
+    (set-view! view {}))
+  ([view params]
+   (om/transact! root-cursor #(assoc % :current-view view
+                                       :current-view-params params))
+   (case view
+     :home
+     (load-users!)
+     :user
+     (load-user-info! (:id params)))))
 
 (defn- url [& parts]
   (apply str
@@ -40,4 +46,15 @@
                   <!
                   :body :users)]
         (om/update! all-users r)
+        r)))
+
+(defn load-user-info!
+  "Load info for the given user"
+  [id]
+  (go (let [r (-> (url "users" id)
+                  (http/get {:with-credentials? false})
+                  <!
+                  :body)]
+        (println "-- -- loaded:" r)
+        (om/update! current-user r)
         r)))

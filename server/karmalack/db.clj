@@ -96,8 +96,35 @@
            [id {:skill skill :banner banner}]))
     (into {})))
 
+(defn- user-stats [db id]
+  (->>
+    (d/q '[:find ?source ?grantee ?delta
+           :in $ ?id
+           :with ?k
+           :where
+           [?k :karma/delta ?delta]
+           [?k :karma/user ?u]
+           [?k :karma/source ?source]
+           [?k :karma/grantee ?grantee]
+           [?u :user/userid ?id]]
+         db id)))
 
+(defn- user-info [db id]
+  (some->>
+    (d/q '[:find ?banner ?skill
+           :in $ ?id
+           :where
+           [?u :user/userid ?id]
+           [?u :user/skill ?skill]
+           [?u :user/banner ?banner]]
+         db id)
+    (map #(zipmap [:banner :skill] %))
+    first))
 
+(defn all-user-stats [component id]
+  (let [db (d/db (:connection component))]
+    (when-let [ui (user-info db id)]
+      (assoc ui :stats (user-stats db id)))))
 
 (defn setup-database! [uri]
   (d/create-database uri)
@@ -183,3 +210,4 @@
 
 (defn new-database [config]
   (map->Database config))
+

@@ -41,8 +41,16 @@
     border-bottom: none;
 }
 
-.mini-profile h3 {
-    margin: 8px 0 8px 16px;
+.mini-profile .name {
+    font-size: 25px;
+    margin: 4px 0 4px 16px;
+    color: #666;
+    font-weight: 200;
+}
+
+.mini-profile .name:hover {
+    text-decoration: none;
+    color: #999;
 }
 
 .mini-profile .name.online:after {
@@ -78,8 +86,6 @@
     width: 48px;
     height: 48px;
 
-    background: url(http://www.gravatar.com/avatar/205e460b479e2e5b48aec07710c08d50?s=50);
-
     -webkit-border-radius: 50%;
     -moz-border-radius: 50%;
     border-radius: 50%;
@@ -95,4 +101,93 @@
 .loading {
     padding: 10px;
     color: #999;
+}
+
+.user-view .banner {
+    position: relative;
+    min-height: 500px;
+    border-bottom: 1px solid #888;
+    box-shadow: 1px 0px 3px #888;
+    color: #eee;
+}
+
+.user-view .banner .user-info {
+    width: 100%;
+    text-align: center;
+    font-size: 3em;
+    position: absolute;
+    bottom: 0px;
+    padding: 40px;
+    background-color: rgba(0, 0, 0, 0.4);
+    text-shadow: 0px 1px 1px #333, 0px -1px 1px #333, 1px 0px 1px #333, -1px 0px 1px #333;
+}
+
+.user-view .banner .user-info .skill {
+    font-size: 0.3em;
+    text-transform: uppercase;
+    color: #ccc;
+}
+
+.user-view .banner .user-info .useravatar  {
+    width: 128px;
+    height: 128px;
+    background: #666;
+    background-size: cover;
+    position: absolute;
+    left: 50%;
+    margin-left: -64px;
+    top: -100px;
+    -webkit-border-radius: 50%;
+    -moz-border-radius: 50%;
+    border-radius: 50%;
+    border: 3px solid #eee;
+}
+
+.user-stats {
+    margin-top: 30px;
+}
+
+.panel {
+    border:none;
+    box-shadow: none;
+}
+
+.panel>.panel-heading {
+    background: none;
+    color: #ccc;
+    border-bottom: 1px dashed #ccc;
+    text-transform: uppercase;
+}
+
+.karma-stats {
+    font-size: 2em;
+}
+
+.karma-stats div {
+    display: inline-block;
+    margin-right: 20px;
+}
+
+.karma-stats i {
+    font-size: 0.5em;
+}
+
+.karma-stats .total {
+    color: #999;
+    font-size: 1.5em;
+}
+
+.karma-stats .up {
+    color: #32978D;
+}
+
+.karma-stats .down {
+    color: #50092F;
+}
+
+.no-data {
+    font-size: 0.8em;
+    color: #ccc;
+    text-transform: uppercase;
+    font-weight: 700;
 }
