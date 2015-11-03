@@ -1,5 +1,22 @@
 /* some style */
 
+
+.loader .loader-widget {
+    width: 100%;
+    text-align: center;
+    margin-top: 40px;
+    color: #999;
+}
+
+.loader h4 {
+    text-align: center;
+    text-transform: uppercase;
+    font-size: 0.8em;
+    font-weight: 700;
+    margin-top: 40px;
+    color: #aaa;
+}
+
 .home {
     margin-top: 3em;
 }
@@ -33,6 +50,7 @@
 }
 
 .mini-profile {
+    display: block;
     padding: 5px 10px;
     border-bottom: 1px dashed #eee;
 }
@@ -48,9 +66,9 @@
     font-weight: 200;
 }
 
-.mini-profile .name:hover {
+.mini-profile:hover {
     text-decoration: none;
-    color: #999;
+    background-color: #eee;
 }
 
 .mini-profile .name.online:after {
@@ -66,8 +84,13 @@
     font-size: 0.9em;
 }
 
-.mini-profile .karma {
+.mini-profile .skill {
+    font-weight: 700;
     color: #ccc;
+}
+
+.mini-profile .karma {
+    color: #aaa;
     font-size: 1.8em;
 }
 
@@ -93,9 +116,7 @@
 }
 
 .no-users {
-    font-size: 1.1em;
-    color: #999;
-    padding: 10px;
+    padding: 10px 55px;
 }
 
 .loading {
@@ -154,7 +175,7 @@
 
 .panel>.panel-heading {
     background: none;
-    color: #ccc;
+    color: #aaa;
     border-bottom: 1px dashed #ccc;
     text-transform: uppercase;
 }
@@ -174,7 +195,7 @@
 
 .karma-stats .total {
     color: #999;
-    font-size: 1.5em;
+    font-size: 2.5em;
 }
 
 .karma-stats .up {
@@ -191,3 +212,17 @@
     text-transform: uppercase;
     font-weight: 700;
 }
+
+.tip {
+    color: #aaa;
+    font-size: 0.8em;
+    text-transform: uppercase;
+    margin-bottom: 5px;
+}
+
+.ct-label {
+    font-size: 12px;
+    font-weight: 700;
+    color: #aaa;
+}
+

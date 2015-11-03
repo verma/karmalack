@@ -5,15 +5,34 @@
             [clojure.core.async :refer [go go-loop <!]]))
 
 
-(defn starts-with [s ss]
-  (not (neg? (.indexOf s ss))))
+(def ^:private known-commands #{"inc" "dec" "skill" "banner"})
+(def ^:private known-directed-commands #{"help"})
 
+(defn- is-directed? [parts self-id]
+  (let [cmd (first parts)]
+    (or (= (str "<@" self-id ">") cmd)
+        (= (str "<@" self-id ">:") cmd))))
 
 (defn- parse-command [msg self-id]
-  (when-let [[_ id text] (re-matches #"^<@([A-Z0-9]+)>:?(.*)" msg)]
-    (when (= id self-id)
-      (clojure.string/split
-        (clojure.string/trim text) #" "))))
+  ;; A command could be a directed or a non-directed one
+  ;; directed ones are the ones where karmabot was explicitly
+  ;; asked for attention
+  (let [parts (-> msg
+                  clojure.string/trim
+                  (clojure.string/split #" "))
+        directed? (is-directed? parts self-id)
+        command-name (if directed?
+                       (second parts)
+                       (first parts))]
+    (if directed?
+      (when (known-directed-commands command-name)
+        {:directed? true
+         :command   command-name
+         :args      (vec (next (next parts)))})
+      (when (known-commands command-name)
+        {:directed? false
+         :command   command-name
+         :args      (vec (next parts))}))))
 
 (defn- validate-user [tag]
   (if-let [v (and (not (nil? tag))
@@ -61,6 +80,19 @@
       (db/settings-save-skill! db from skill)
       "skill updated :thumbsup:")))
 
+(defmethod handle-command "help" [_ db from _]
+  (clojure.string/join
+    "\n"
+    ["```"
+     "I accept the following commands:"
+     ""
+     "help                 : This command, needs to be directed to me."
+     "inc @user            : Bump up the karma for @user."
+     "dec @user            : Decrement @user's karma."
+     "skill <skill string> : Set your skill/title for your karmalack profile page."
+     "banner <https URL>   : Set your banner for your karmalack profile page."
+     "```"]))
+
 (defmethod handle-command :default [_ _ _ _]
   (str "Sorry I don't understand that command, known commands: inc, dec, banner and skill."))
 
@@ -83,7 +115,11 @@
             (when (and channel user text)
               (when-let [cmd (parse-command text self-id)]
                 (let [r (try
-                          (handle-command cmd database user channel)
+                          (println "command:" cmd)
+                          (let [command (:command cmd)
+                                args (:args cmd)
+                                cmd-line (concat [command] args)]
+                            (handle-command cmd-line database user channel))
                           (catch Exception e
                             (.getMessage e)))]
                   (rtm/send-event
@@ -107,3 +143,15 @@
 (defn new-slackbot [config]
   (map->SlackBot config))
 
+(comment
+  (defn start-debug [config]
+    (let [sys (component/system-map
+                :database (db/new-database config)
+                :slackbot (component/using
+                            (new-slackbot config)
+                            [:database]))]
+      (component/start sys)))
+
+  (def sys (start-debug (karmalack.config/config)))
+
+  (component/stop sys))

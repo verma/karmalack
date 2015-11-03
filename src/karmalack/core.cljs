@@ -26,6 +26,8 @@
 (defn startup []
   (om/root main-app state/app-state
            {:target (.getElementById js/document "app")})
+  ;; indicate we are starting up...
+  (state/set-loading "Initializing Application...")
   (start-routes!))
 
 (startup)

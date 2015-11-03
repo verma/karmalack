@@ -9,7 +9,6 @@
   (state/set-view! :home))
 
 (defroute user "/user/:id" [id]
-  (println "-- -- setting user view:" id)
   (state/set-view! :user {:id id}))
 
 (defn start-routes! []

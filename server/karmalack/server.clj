@@ -1,15 +1,15 @@
 (ns karmalack.server
- (:require [karmalack.config :refer [slack-conn-config dev?]]
+ (:require [karmalack.config :refer [dev?]]
            [karmalack.db :as db]
            [karmalack.slack-api :as sa]
+           [karmalack.runtime :as runtime]
            [compojure.core :refer :all]
+           [compojure.route :as route]
            [liberator.core :refer [defresource resource]]
-           [clj-slack.core :as slack]
            [org.httpkit.server :refer [run-server]]
            [com.stuartsierra.component :as component]
-           [ring.middleware.cors :refer [wrap-cors]]
-           [ring.middleware.reload :refer [wrap-reload]]
-           [ring.middleware.defaults :refer [wrap-defaults api-defaults]]))
+           [ring.middleware.defaults :refer [wrap-defaults api-defaults]]
+           [ring.util.response :as resp]))
 
 
 (defresource get-users [database slack-api]
@@ -50,11 +50,10 @@
                  (merge info
                         karma-info))))
 
-(defn wrap-debug [handler]
-  (-> handler
-      (wrap-reload)
-      (wrap-cors :access-control-allow-origin #".*"
-                 :access-control-allow-methods [:get])))
+(defn serve-home []
+  (-> (resp/resource-response "index.html" {:root "public"})
+      (resp/content-type "text/html")
+      (resp/charset "utf-8")))
 
 (defrecord Server [port debug? database slack-api stop-fn]
   component/Lifecycle
@@ -62,16 +61,17 @@
     (if stop-fn
       this
       (let [handler (-> (routes
+                          (GET "/" [] (serve-home))
                           (context "/api" []
                             (ANY "/users" [] (get-users database slack-api))
-                            (ANY "/users/:id" [id] (user-info database slack-api id))))
+                            (ANY "/users/:id" [id] (user-info database slack-api id)))
+                          (route/resources "/")
+                          (route/not-found "Page not found"))
                         (wrap-defaults api-defaults))
             port (or port 3000)
-            stop (run-server (if (dev?)
-                               (wrap-debug handler)
-                               handler)
+            stop (run-server (runtime/wrap-handler handler)
                              {:port port})]
-        (println ":: server :: startup on port:" port "debug?" (dev?))
+        (println ":: server :: startup on port:" port "debug?" runtime/dev?)
         (assoc this :stop-fn stop))))
 
   (stop [this]
@@ -86,6 +86,7 @@
   (map->Server config))
 
 (comment
+
   (defn start-debug [config]
     (let [sys (component/system-map
                 :database (db/new-database config)

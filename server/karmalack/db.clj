@@ -1,7 +1,5 @@
 (ns karmalack.db
-  (:require [clojure.java.jdbc :as sql]
-            [yesql.core :refer [defqueries]]
-            [clj-time.core :as t]
+  (:require [clj-time.core :as t]
             [clj-time.local :as l]
             [clj-time.coerce :as c]
             [com.stuartsierra.component :as component]

@@ -12,5 +12,5 @@
      :token (:slack-api-token c)}))
 
 (defn dev? []
-  (not (nil? (:dev env))))
+  (:dev env))
 
