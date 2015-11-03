@@ -48,7 +48,7 @@
 (defn- sort-users-by-karma [users]
   (let [users-with-karma (filter :karma users)
         users-wo-karma (remove :filter users)]
-    (concat (sort-by :karma users-with-karma)
+    (concat (sort-by :karma #(compare %2 %1) users-with-karma)
             (sort-by :name users-wo-karma))))
 
 (defn home [data owner]
