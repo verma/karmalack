@@ -43,8 +43,7 @@
                                   "channels.list")
                    :channels
                    (map #(vector (:id %) (:name %)))
-                   (into {}))
-              )))
+                   (into {})))))
 
 (defn get-all-users [{:keys [slack-api-token cache]}]
   (cache-op cache :users
@@ -59,3 +58,16 @@
                                           :avatar-small (or (get-in % [:profile :image_48])
                                                             (get-in % [:profile :image_32]))}))
                    (into {})))))
+
+(defn get-team-info [{:keys [:slack-api-token :cache]}]
+  (cache-op cache :team
+            (fn []
+              (let [info
+                    (-> (slack-request slack-api-token
+                                       "team.info")
+                        :team)]
+                (-> info
+                    (select-keys [:id :name])
+                    (assoc :avatar (or (get-in info [:icon :image_132])
+                                       (get-in info [:icon :image_102])
+                                       (get-in info [:icon :image_88]))))))))

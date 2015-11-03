@@ -12,7 +12,7 @@
            [ring.util.response :as resp]))
 
 
-(defresource get-users [database slack-api]
+(defresource all-users [database slack-api]
   :available-media-types ["application/json"]
   :allowed-methods [:get]
   :handle-ok (fn [_]
@@ -30,6 +30,13 @@
                                    {:settings s}))))
 
                     users)})))
+
+(defresource team-info [database slack-api]
+  :available-media-types ["application/json"]
+  :allowed-methods [:get]
+  :handle-ok (fn [_]
+               (let [info (sa/get-team-info slack-api)]
+                 {:team info})))
 
 (defresource user-info [database slack-api id]
   :available-media-types ["application/json"]
@@ -63,7 +70,8 @@
       (let [handler (-> (routes
                           (GET "/" [] (serve-home))
                           (context "/api" []
-                            (ANY "/users" [] (get-users database slack-api))
+                            (ANY "/team" [] (team-info database slack-api))
+                            (ANY "/users" [] (all-users database slack-api))
                             (ANY "/users/:id" [id] (user-info database slack-api id)))
                           (route/resources "/")
                           (route/not-found "Page not found"))
@@ -86,7 +94,6 @@
   (map->Server config))
 
 (comment
-
   (defn start-debug [config]
     (let [sys (component/system-map
                 :database (db/new-database config)

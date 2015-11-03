@@ -35,7 +35,20 @@
     color: #bbb;
     text-transform: uppercase;
     font-size: 0.5em;
-    margin-top: 20px;
+    margin-top: 14px;
+    margin-right: 15px;
+}
+
+.home .team-name {
+    text-transform: lowercase;
+}
+
+.home .team-avatar {
+    width: 48px;
+    height: 48px;
+    background-color: #aaa;
+    border-radius:3px;
+    background-size: contain;
 }
 
 .home h1 input {

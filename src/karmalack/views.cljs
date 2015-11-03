@@ -45,20 +45,28 @@
          (sort-by first)
          (map second))))
 
+(defn- sort-users-by-karma [users]
+  (let [users-with-karma (filter :karma users)
+        users-wo-karma (remove :filter users)]
+    (concat (sort-by :karma users-with-karma)
+            (sort-by :name users-wo-karma))))
+
 (defn home [data owner]
   (reify
     om/IDidMount
     (did-mount [_]
       (om/set-state! owner :loading? true)
       (go (<! (state/load-users!))
+          (<! (state/load-team-info!))
           (om/set-state! owner :loading? false)))
 
     om/IRenderState
     (render-state [_ {:keys [filter loading?]}]
-      (let [users (om/observe owner state/all-users)
+      (let [team (om/observe owner state/team)
+            users (om/observe owner state/all-users)
             filtered-users (if-not (clojure.string/blank? filter)
                              (filter-users @users filter)
-                             (sort-by :karma #(compare %2 %1) @users))
+                             (sort-users-by-karma @users))
 
             handle-change (fn [e]
                             (let [text (.. e -target -value)]
@@ -69,7 +77,9 @@
             [:.col-xs-12
              [:h1.title.clearfix
               [:i.fa.fa-slack.slack.pull-left]
-              [:.pull-left "techcorridor.io"]
+              [:.team-name.pull-left (:name @team)]
+              [:.team-avatar.pull-right
+               {:style {:background-image (str "url(" (:avatar @team) ")")}}]
               [:.page-title.pull-right "Profiles & Ranking"]
               [:input {:type        "text"
                        :value       filter

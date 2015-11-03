@@ -8,6 +8,7 @@
 (defonce app-state (atom {:all-users []
                           :loader {}
                           :current-user {}
+                          :team {}
                           :current-view :home}))
 
 ;; root cursor into our state
@@ -17,9 +18,11 @@
 (def root (om/ref-cursor root-cursor))
 (def all-users (om/ref-cursor (:all-users root)))
 (def current-user (om/ref-cursor (:current-user root)))
+(def team (om/ref-cursor (:team root)))
 (def loader (om/ref-cursor (:loader root)))
 
 (declare load-users!)
+(declare load-team-info!)
 (declare load-user-info!)
 
 (defn- view-load-actions! [view params]
@@ -56,6 +59,18 @@
                   <!
                   :body :users)]
         (om/update! all-users r)
+        (set-loading nil)
+        r)))
+
+(defn load-team-info!
+  "Load information about the team"
+  []
+  (go (set-loading "Loading team information...")
+      (let [r (-> (url "team")
+                  (http/get {:with-credentials? false})
+                  <!
+                  :body :team)]
+        (om/update! team r)
         (set-loading nil)
         r)))
 
