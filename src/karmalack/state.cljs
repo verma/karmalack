@@ -42,7 +42,7 @@
 
 (defn- url [& parts]
   (apply str
-         "http://localhost:3000/api/"
+         "/api/"
          (clojure.string/join "/" parts)))
 
 (defn- set-loading [msg]

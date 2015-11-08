@@ -1,2 +1,4 @@
 {:slack-api-key "XXXXXXX"
- :slack-bot-token "XXXXXXXX"}
+ :slack-bot-token "XXXXXXXX"
+ :datomic-uri "XXXXXXX"
+ :base-url "http://localhost:3000"}

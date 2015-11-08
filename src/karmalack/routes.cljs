@@ -8,7 +8,7 @@
 (defroute home "/" []
   (state/set-view! :home))
 
-(defroute user "/user/:id" [id]
+(defroute user "/users/:id" [id]
   (state/set-view! :user {:id id}))
 
 (defn start-routes! []

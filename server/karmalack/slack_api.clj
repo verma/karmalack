@@ -71,3 +71,13 @@
                     (assoc :avatar (or (get-in info [:icon :image_132])
                                        (get-in info [:icon :image_102])
                                        (get-in info [:icon :image_88]))))))))
+
+(defn get-reaction-info [{:keys [:slack-api-token :cache]} channel ts]
+  (cache-op cache (keyword (str "reaction-" channel "-" ts))
+            (fn []
+              (let [r (-> (slack-request slack-api-token
+                                         "reactions.get"
+                                         {"channel" channel
+                                          "timestamp" ts})
+                          :message)]
+                r))))

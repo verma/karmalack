@@ -56,4 +56,4 @@
                 [:database :slack-api])
       :skackbot (component/using
                   (new-slackbot c)
-                  [:database]))))
+                  [:database :slack-api]))))

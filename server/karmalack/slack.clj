@@ -1,102 +1,143 @@
 (ns karmalack.slack
   (:require [karmalack.db :as db]
+            [karmalack.slack-api :as sa]
             [com.stuartsierra.component :as component]
             [slack-rtm.core :as rtm]
-            [clojure.core.async :refer [go go-loop <!]]))
+            [clojure.core.async :as async :refer [go go-loop <!]]))
 
 
-(def ^:private known-commands #{"inc" "dec" "skill" "banner"})
-(def ^:private known-directed-commands #{"help"})
-
-(defn- is-directed? [parts self-id]
-  (let [cmd (first parts)]
-    (or (= (str "<@" self-id ">") cmd)
-        (= (str "<@" self-id ">:") cmd))))
-
-(defn- parse-command [msg self-id]
-  ;; A command could be a directed or a non-directed one
-  ;; directed ones are the ones where karmabot was explicitly
-  ;; asked for attention
-  (let [parts (-> msg
-                  clojure.string/trim
-                  (clojure.string/split #" "))
-        directed? (is-directed? parts self-id)
-        command-name (if directed?
-                       (second parts)
-                       (first parts))]
-    (if directed?
-      (when (known-directed-commands command-name)
-        {:directed? true
-         :command   command-name
-         :args      (vec (next (next parts)))})
-      (when (known-commands command-name)
-        {:directed? false
-         :command   command-name
-         :args      (vec (next parts))}))))
-
-(defn- validate-user [tag]
-  (if-let [v (and (not (nil? tag))
-                  (when-let [r (re-matches #"^<@([A-Z0-9]+)>" tag)]
-                    (second r)))]
-    v
-    (throw (Exception. ":thumbsdown: a valid user id is needed as an argument, e.g. @user."))))
+(def ^:private known-directed-commands #{:help :skill :banner})
+(def ^:private reaction-mappings
+  {"+1" :inc
+   "-1" :dec})
 
 
-(defn- to-user [id msg]
-  (str "<@" id ">: " msg))
+(defn- starts-with? [text s]
+  (zero? (.indexOf text s)))
 
-(defmulti handle-command (fn [cmd db from channel]
-                           (first cmd)))
+(defn- parse-self [cmd self-id]
+  (let [prefixes [(str "<@" self-id ">:")
+                  (str "<@" self-id ">")]]
+    (loop [[p & ps] prefixes]
+      (if p
+        (if (starts-with? cmd p)
+          [true (clojure.string/trim (subs cmd (count p)))]
+          (recur ps))
+        [false cmd]))))
 
-(defmethod handle-command "inc" [[_ user] db from channel]
-  (let [u (validate-user user)]
-    (when (= u from)
-      (throw (Exception. ":thumbsdown: you cannot assign karma to yourself.")))
-    (db/karma-inc! db u from channel)
-    ":thumbsup:"))
+(defn- to-user [id channel msg]
+  {:type    "message"
+   :channel channel
+   :text (str "<@" id ">: " msg)})
 
-(defmethod handle-command "dec" [[_ user] db from channel]
-  (let [u (validate-user user)]
-    (when (= u from)
-      (throw (Exception. ":thumbsdown: you cannot assign karma to yourself.")))
-    (db/karma-dec! db u from channel)
-    ":thumbsup:"))
+(defmulti handle-command (fn [cmd _ _ _]
+                           (:type cmd)))
 
-(defmethod handle-command "banner" [[_ url] db from _]
-  (if-let [r (re-matches #"^<(https:\/\/.*)>$" (or url ""))]
-    (do
-      (db/settings-save-banner! db from (second r))
-      (str "banner update :thumbsup:"))
-    (throw (Exception. ":thumbsdown: banner command needs a https url as an argument."))))
+(defn- user-url [base-url id]
+  (str base-url "/#/users/" id))
 
-(defmethod handle-command "skill" [[_ s & parts] db from _]
-  (if (clojure.string/blank? s)
-    (do
-      (db/settings-save-skill! db from "")
-      "skill cleared :thumbsup:")
-    (let [skill (clojure.string/join
-                  " "
-                  (concat [s] parts))]
-      (db/settings-save-skill! db from skill)
-      "skill updated :thumbsup:")))
+(defmethod handle-command :inc [{:keys [from channel ts]} _ db sapi]
+  (when-let [rm (sa/get-reaction-info sapi channel ts)]
+    (when-not (= from (:user rm))
+      (db/karma-inc! db (:user rm) from channel)
+      (println ":: sb :: karma inc for" (:user rm))
+      nil)))
 
-(defmethod handle-command "help" [_ db from _]
-  (clojure.string/join
-    "\n"
-    ["```"
-     "I accept the following commands:"
-     ""
-     "help                 : This command, needs to be directed to me."
-     "inc @user            : Bump up the karma for @user."
-     "dec @user            : Decrement @user's karma."
-     "skill <skill string> : Set your skill/title for your karmalack profile page."
-     "banner <https URL>   : Set your banner for your karmalack profile page."
-     "```"]))
+(defmethod handle-command :dec [{:keys [from channel ts]} _ db sapi]
+  (when-let [rm (sa/get-reaction-info sapi channel ts)]
+    (when-not (= from (:user rm))
+      (db/karma-dec! db (:user rm) from channel)
+      (println ":: sb :: karma dec for" (:user rm))
+      nil)))
 
-(defmethod handle-command :default [_ _ _ _]
-  (str "Sorry I don't understand that command, known commands: inc, dec, banner and skill."))
+(defmethod handle-command :banner [{:keys [from channel args]} config db _]
+  (to-user
+    from channel
+    (if-let [r (re-matches #"^<(https:\/\/.*)>$" (or (first args) ""))]
+      (do
+        (db/settings-save-banner! db from (second r))
+        (str
+          "banner update :thumbsup:. See it here: "
+          (user-url (:base-url config) from)))
+      ":thumbsdown: banner command needs a https url as an argument.")))
 
-(defrecord SlackBot [slack-bot-token connection chan database]
+(defmethod handle-command :skill [{:keys [args from channel]} config db _]
+  (to-user
+    from channel
+    (if-let [s (seq args)]
+      (let [skill (clojure.string/join " " s)]
+        (db/settings-save-skill! db from skill)
+        (str
+          "skill updated :thumbsup:. See it here: "
+          (user-url (:base-url config) from)))
+      (do
+        (db/settings-save-skill! db from "")
+        "skill cleared :thumbsup:"))))
+
+(defmethod handle-command :help [{:keys [from channel]} _ _ _]
+  (to-user
+    from channel
+    (clojure.string/join
+      "\n"
+      ["```"
+       "Just award messages either a thumbs up or a thumbs down reaction to contribute towards their karma."
+       ""
+       "Along with that, I accept the following commands which all need to be directed to me like @karmabot: command <args>:"
+       ""
+       "help                 : This command."
+       "skill <skill string> : Set your skill/title for your karmalack profile page."
+       "banner <https URL>   : Set your banner for your karmalack profile page."
+       "```"])))
+
+(defmethod handle-command :default [cmd _ _ _]
+  (println "Unknown command:" cmd))
+
+(defn- parse-command [self-id cmd]
+  (case (:type cmd)
+    "reaction_added"
+    (when-let [mapping (get reaction-mappings (:reaction cmd))]
+      {:type    mapping
+       :from    (:user cmd)
+       :channel (get-in cmd [:item :channel])
+       :ts (get-in cmd [:item :ts])})
+
+    "message"
+    (let [[directed? cmd-str] (parse-self (:text cmd) self-id)
+          parts (clojure.string/split cmd-str #" ")
+          cmd-name (keyword (first parts))
+          args (next parts)]
+      (when (and directed?
+                 (known-directed-commands cmd-name))
+        {:type    cmd-name
+         :directed? directed?
+         :args    (vec args)
+         :channel (:channel cmd)
+         :from    (:user cmd)}))
+    nil))
+
+(defn- process-cmd [cmd config database slack-api]
+  (go
+    (try
+      (let [parsed-cmd (parse-command (:self-id config) cmd)
+            res (handle-command parsed-cmd
+                                config
+                                database slack-api)]
+        res)
+      (catch Exception e
+        (println "-- -- WARN: failed to process command:" cmd e)))))
+
+(comment
+  (def test-a {:type "reaction_added", :user "U02G768Q0", :item {:type "message", :channel "C0D88BQJU", :ts 1447009957.000002}, :reaction "+1", :event_ts 1447009988.945251})
+  (def test-b {:type "message", :channel "C0D88BQJU", :user "U02G768Q0", :text "<@U0D835P61>: skill hello world", :ts 1447009972.000004, :team "T02G698S5"})
+  (def test-c {:type "message", :channel "C0D88BQJU", :user "U02G768Q0", :text "what", :ts 1447009967.000003, :team "T02G698S5"})
+
+
+  (let [self-id "U0D835P61"]
+    (println (parse-command self-id test-a)
+             (parse-command self-id test-b)
+             (parse-command self-id test-c))))
+
+(defrecord SlackBot [slack-bot-token base-url chan-msg chan-rec connection database slack-api]
   component/Lifecycle
   (start [this]
     (if connection
@@ -104,40 +145,36 @@
       (let [conn (rtm/connect slack-bot-token)
             self-id (get-in conn [:start :self :id])
             self-name (get-in conn [:start :self :name])
-            chan (rtm/sub-to-event (:events-publication conn) :message)]
+            chan-msg (rtm/sub-to-event (:events-publication conn) :message)
+            chan-rec (rtm/sub-to-event (:events-publication conn) :reaction_added)]
         (println ":: sb :: startup as:" self-name "and id:" self-id)
 
         ;; start a go look
         (go-loop []
-          (when-let [{:keys [channel user text]} (<! chan)]
-            (println ":: sb :: " channel user text)
-
-            (when (and channel user text)
-              (when-let [cmd (parse-command text self-id)]
-                (let [r (try
-                          (println "command:" cmd)
-                          (let [command (:command cmd)
-                                args (:args cmd)
-                                cmd-line (concat [command] args)]
-                            (handle-command cmd-line database user channel))
-                          (catch Exception e
-                            (.getMessage e)))]
-                  (rtm/send-event
-                    (:dispatcher conn)
-                    {:type    "message"
-                     :channel channel
-                     :text    (to-user user r)}))))
+          (when-let [[cmd _] (async/alts! [chan-msg chan-rec])]
+            (println ":: sb :: " cmd)
+            (go
+              (when-let [r (<! (process-cmd cmd
+                                            {:self-id self-id
+                                             :base-url base-url}
+                                            database slack-api))]
+                (rtm/send-event
+                  (:dispatcher conn) r)))
             (recur)))
 
         (assoc this :connection conn
-                    :chan chan))))
+                    :chan-msg chan-msg
+                    :chan-rec chan-rec))))
 
   (stop [this]
     (if connection
       (do
         (println ":: sb :: shutdown.")
-        (rtm/unsub-from-event (:events-publication connection) :message chan)
-        (assoc this :connection nil :chan nil))
+        (rtm/unsub-from-event (:events-publication connection)
+                              :message chan-msg)
+        (rtm/unsub-from-event (:events-publication connection)
+                              :reaction_added chan-rec)
+        (assoc this :connection nil :chan-msg nil :chan-rec nil))
       this)))
 
 (defn new-slackbot [config]
@@ -147,9 +184,10 @@
   (defn start-debug [config]
     (let [sys (component/system-map
                 :database (db/new-database config)
+                :slack-api (sa/new-slack-api config)
                 :slackbot (component/using
                             (new-slackbot config)
-                            [:database]))]
+                            [:database :slack-api]))]
       (component/start sys)))
 
   (def sys (start-debug (karmalack.config/config)))
