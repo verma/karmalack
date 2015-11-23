@@ -30,6 +30,13 @@
    :channel channel
    :text (str "<@" id ">: " msg)})
 
+(defn- timestamp []
+  (.getTime (java.util.Date.)))
+
+(defn- formatted-timestamp []
+  (let [formatter (java.text.SimpleDateFormat. "yyyy/MM/dd HH:mm:ss")]
+    (.format formatter (java.util.Date.))))
+
 (defmulti handle-command (fn [cmd _ _ _]
                            (:type cmd)))
 
@@ -74,6 +81,9 @@
         (db/settings-save-skill! db from "")
         "skill cleared :thumbsup:"))))
 
+(defmethod handle-command :pong [{:keys [time]} _ _ _]
+  (println ":: sb ::" (formatted-timestamp) ": got pong, round-trip time is" (- (timestamp) time) "ms"))
+
 (defmethod handle-command :help [{:keys [from channel]} _ _ _]
   (to-user
     from channel
@@ -90,10 +100,13 @@
        "```"])))
 
 (defmethod handle-command :default [cmd _ _ _]
-  (println "Unknown command:" cmd))
+  (println ":: sb :: Unknown command:" cmd))
 
 (defn- parse-command [self-id cmd]
   (case (:type cmd)
+    "pong"
+    (assoc cmd :type :pong)
+
     "reaction_added"
     (when-let [mapping (get reaction-mappings (:reaction cmd))]
       {:type    mapping
@@ -124,7 +137,7 @@
                                 database slack-api)]
         res)
       (catch Exception e
-        (println "-- -- WARN: failed to process command:" cmd e)))))
+        (println ":: sb :: WARN: failed to process command:" cmd e)))))
 
 (comment
   (def test-a {:type "reaction_added", :user "U02G768Q0", :item {:type "message", :channel "C0D88BQJU", :ts 1447009957.000002}, :reaction "+1", :event_ts 1447009988.945251})
@@ -137,7 +150,10 @@
              (parse-command self-id test-b)
              (parse-command self-id test-c))))
 
-(defrecord SlackBot [slack-bot-token base-url chan-msg chan-rec connection database slack-api]
+(defrecord SlackBot [slack-bot-token base-url
+                     chan-shutdown
+                     chan-pong chan-msg chan-rec
+                     connection database slack-api]
   component/Lifecycle
   (start [this]
     (if connection
@@ -145,24 +161,46 @@
       (let [conn (rtm/connect slack-bot-token)
             self-id (get-in conn [:start :self :id])
             self-name (get-in conn [:start :self :name])
-            chan-msg (rtm/sub-to-event (:events-publication conn) :message)
-            chan-rec (rtm/sub-to-event (:events-publication conn) :reaction_added)]
+            pub (:events-publication conn)
+            chan-shutdown (async/chan)
+            chan-pong (rtm/sub-to-event pub :pong)
+            chan-msg (rtm/sub-to-event pub :message)
+            chan-rec (rtm/sub-to-event pub :reaction_added)]
         (println ":: sb :: startup as:" self-name "and id:" self-id)
 
         ;; start a go look
         (go-loop []
-          (when-let [[cmd _] (async/alts! [chan-msg chan-rec])]
-            (println ":: sb :: " cmd)
-            (go
-              (when-let [r (<! (process-cmd cmd
-                                            {:self-id self-id
-                                             :base-url base-url}
-                                            database slack-api))]
-                (rtm/send-event
-                  (:dispatcher conn) r)))
-            (recur)))
+          (let [to-chan (async/timeout 10000)]
+            (when-let [[cmd ch] (async/alts!
+                                  [chan-shutdown chan-msg chan-rec
+                                   chan-pong to-chan])]
+              (cond
+                ;; Do nothing when a shutdown has been triggered
+                (= ch chan-shutdown)
+                nil
+
+                ;; no activity just send a ping to the server
+                (= ch to-chan)
+                (do
+                  (rtm/send-event (:dispatcher conn) {:type "ping"
+                                                      :time (timestamp)})
+                  (recur))
+
+                ;; all other commands go through processing pipeline
+                :else
+                (do
+                  (go
+                    (println ":: sb :: " cmd)
+                    (when-let [r (<! (process-cmd cmd
+                                                  {:self-id  self-id
+                                                   :base-url base-url}
+                                                  database slack-api))]
+                      (rtm/send-event (:dispatcher conn) r)))
+                  (recur))))))
 
         (assoc this :connection conn
+                    :chan-shutdown chan-shutdown
+                    :chan-pong chan-pong
                     :chan-msg chan-msg
                     :chan-rec chan-rec))))
 
@@ -170,11 +208,18 @@
     (if connection
       (do
         (println ":: sb :: shutdown.")
+        (async/close! chan-shutdown)
+        (rtm/unsub-from-event (:events-publication connection)
+                              :pong chan-pong)
         (rtm/unsub-from-event (:events-publication connection)
                               :message chan-msg)
         (rtm/unsub-from-event (:events-publication connection)
                               :reaction_added chan-rec)
-        (assoc this :connection nil :chan-msg nil :chan-rec nil))
+        (assoc this :connection nil
+                    :chan-shutdown nil
+                    :chan-pong nil
+                    :chan-msg nil
+                    :chan-rec nil))
       this)))
 
 (defn new-slackbot [config]
